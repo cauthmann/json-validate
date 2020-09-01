@@ -1,0 +1,12 @@
+{
+  "name": "json-validate",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Validates JSON values against a schema",
+  "main": "src/validate.mjs",
+  "scripts": {
+    "test": "node src/test.mjs"
+  },
+  "author": "Christian Authmann",
+  "license": "ISC"
+}
