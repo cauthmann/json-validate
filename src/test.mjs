@@ -1,10 +1,10 @@
 
-import { and, or, boolean, number, integer, string, array, object, tuple } from './validate.mjs';
+import { and, or, boolean, number, integer, string, array, object, map, tuple } from './validate.mjs';
 import { match, fail, throws, finish_tests } from './testharness.mjs';
 
 // Functions as validators
 match(() => true, 123);
-fail(() => 'Error', 123.4);
+fail(() => 'Error', 123.4, ['']);
 fail([(v) => v % 2 > 0], [1, 2, 3, 4], ['[1]', '[3]']);
 fail([(arr) => {
 	let errors = {};
@@ -97,7 +97,7 @@ match(
 	match(schema, [1, 2, 3]);
 }
 
-// Tuples
+// Arrays as tuples
 {
 	let schema = tuple(number, string, true);
 	match(schema, [1, '2', true]);
@@ -127,8 +127,8 @@ match({}, {});
 	fail(schema, {
 		a: '',
 		b: 1,
-		c: 'unexpected property'
-	}); // We're not entirely sure if this should fail on '' or on '.c'
+		"a[39]": 'unexpected property'
+	}, ['']); // This fails on '', not '.a[39]' to keep paths in error object sane.
 }
 {
 	let schema = {
@@ -186,11 +186,14 @@ match({}, {});
 	fail(schema, {
 		required: '',
 		unexpected: ''
-	});
+	}, ['']);
 	fail(schema, {
 		optional1: '',
 		optional2: ''
-	});
+	}, ['.required']);
+	fail(schema, {
+		unexpected: ''
+	}, ['']); // Currently, this will abort on an unexpected property, thus it won't emit an error at '.required' for the missing property.
 	fail(schema, {
 		required: 1,
 		optional1: 1,
@@ -224,6 +227,25 @@ match({}, {});
 		optional2: 1,
 		optional3: ''
 	}, ['', '.optional2']);
+}
+
+// Objects as maps
+{
+	let schema = map(/[0-9]+/, integer, 1, 2);
+	match(schema, { 1: 1, 2: 2 });
+	match(schema, { 1: 1 });
+	fail(schema, { 1: "" }, ['.1']);
+	fail(schema, {}, ['']);
+	fail(schema, { 1: 1, 2: 2, 3: 3 }, ['']);
+	fail(schema, { a: 1, 2: 2 }, ['']);
+	fail(schema, { a: "", 2: 2 }, ['']);
+	fail(schema, { a: "", b: "", 2: 2 }, ['']);
+}
+{
+	let schema = map(/[a-z]+/, [integer]);
+	match(schema, { a: [1, 2, 3] });
+	fail(schema, { a: [1, "2", "3"], 9: [""] }, ['']); // Early abort on unexpected properties
+	fail(schema, { 9: [""], a: [1, "2", "3"] }, ['']);
 }
 
 // Combinators

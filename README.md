@@ -31,6 +31,7 @@ let person_schema = {
 	age: and(integer, (age) => age >= 0 && age < 150), // Must be an integer, and in a somewhat plausible range
 	hobbies: [string], // An array containing nothing but strings. Empty arrays are fine.
 	homepage: or(null, string), // Either null or a string.
+	eyes: or('blue', 'brown', 'green', 'other'), // A simple enum.
 };
 ```
 See `src/test.mjs` for more examples.
@@ -119,8 +120,13 @@ The following functions are not valid schemata, but they will return a valid sch
 
   * `object(required_properties, optional_properties, min_optional_properties = 0, max_optional_properties = Inf)`: A bit more powerful than the object-by-example notation, this takes two example objects.
   * `tuple(schema1, schema2, ...)`: While the array-by-example schema matches homogenous arrays, this one matches arrays where each element conforms to a different schema. The length of the array and the tuple definition must match.
+  * `map(key_schema, value_schema, min_entries, max_entries)`: Matches objects used as maps/dictionaries. One schema is applied to all keys (remember, they're strings!), another is applied to all values.
   * `and(schema1, schema2, ...)`: returns a schema that matches if all the schematas match. It is often useful to combine a type check with a value check.
   * `or(schema1, schema2, ...)`: returns a schema that matches if any of the schemata matches. It is often useful to specify "something or null".
+
+There is no function for enums, because `enum` is a reserved keyword in javascript, and because `or` with values by example works just fine.
+
+Again, see `src/test.mjs` for more examples.
 
 # Validation
 
@@ -150,13 +156,15 @@ When `process.env.NODE_ENV === 'development'`, the internal error messages are a
 
 ## Paths
 
-Every error message has a path pointing to the offending part of the value. Paths are similar to the javascript you would use to access the value.
+Every error message has a path pointing to the offending part(s) of the value. Paths are similar to the javascript you would use to access the value.
 
   * `""` is the value itself.
   * `".property"` for object properties.
   * `"[0]"` to index arrays.
 
 These paths can be concatenated to yield complex paths like `.foo[3].bar[4][5]`.
+
+Note that property names are not sanitized and may contain special characters, including `.[]`. The `object` and `map` schemata will protect against this by assigning errors for unexpected properties to the path of the parent object. Nevertheless, you shouldn't try to parse paths, or rely on them for anything more critical than debugging, logging, or assigning error messages to form elements.
 
 # Maintenance and Stability
 
@@ -168,7 +176,7 @@ Things that I will not ever guarantee to be stable:
 
   * Invalid schemata may become valid in a newer version.
   * The built-in error messages during development may change or disappear completely.
-  * The paths where some errors are reported may change. For example, shall we report unexpected properties at the path of the property, or at the path of the containing object?
+  * The paths where some errors are reported may change.
   * The number of errors reported on a failure may change. We may bail earlier on certain errors, or continue longer on others.
   * Obvious bugs will be fixed, even if that changes existing behaviour.
 

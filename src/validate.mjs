@@ -269,7 +269,6 @@ export function plain_object(...args) {
 	}
 }
 
-
 export function tuple(...schemata) {
 	if (schemata.length < 1) {
 		throw new Error('Invalid schema: tuple needs at least one schema');
@@ -289,6 +288,28 @@ export function tuple(...schemata) {
 		}
 		return errors;
 	}
+}
+
+export function map(key_schema, value_schema, min_entries = 0, max_entries = Number.MAX_SAFE_INTEGER) {
+	return (value) => {
+		// Validate keys first, and abort early on unexpected properties.
+		for (let key in value) {
+			if (validateJSON(key_schema, key) !== true)
+				return DEBUG ? `Unexpected property ${key}` : '';
+		}
+		// Validate the values
+		let errors = {};
+		let entries = 0;
+		for (let key in value) {
+			validate2(value_schema, value[key], `.${key}`, errors);
+			entries++;
+		}
+		if (entries < min_entries)
+			errors[''] = DEBUG ? 'Not enough entries in the map' : '';
+		if (entries > max_entries)
+			errors[''] = DEBUG ? 'Too many entries in the map' : '';
+		return errors;
+	};
 }
 
 export function and(...schemata) {
