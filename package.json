@@ -1,12 +1,19 @@
 {
   "name": "json-validate",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Validates JSON values against a schema",
   "main": "src/validate.mjs",
+  "module": "src/validate.mjs",
+  "types": "src/validate.d.ts",
   "scripts": {
+    "build": "tsc -p tsconfig.json --declaration && mv src/validate.js src/validate.mjs",
     "test": "node src/test.mjs"
   },
   "author": "Christian Authmann",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^15.12.5",
+    "typescript": "^4.3.5"
+  }
 }
