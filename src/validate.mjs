@@ -194,10 +194,10 @@ export function object(...args) {
         let value = args[0];
         return is_object(value);
     }
-    if (args.length == 0 || args.length > 5) {
+    if (args.length < 1 || args.length > 4) {
         throw new Error(`object: wrong number of arguments`);
     }
-    let [required_properties = null, optional_properties = null, min_optional_properties = 0, max_optional_properties = Number.MAX_SAFE_INTEGER] = args;
+    let [required_properties, optional_properties = null, min_optional_properties = 0, max_optional_properties = Number.MAX_SAFE_INTEGER] = args;
     if (!is_plain_object(required_properties) || !is_plain_object(optional_properties)) {
         throw new Error('Invalid schema');
     }
@@ -212,7 +212,7 @@ export function object(...args) {
             return DEBUG ? 'Expected object' : '';
         }
         for (let prop in value) {
-            if (!required_properties.hasOwnProperty(prop) && !optional_properties.hasOwnProperty(prop)) {
+            if (!required_properties.hasOwnProperty(prop) && (optional_properties === null || !optional_properties.hasOwnProperty(prop))) {
                 return DEBUG ? `Unexpected property: ${prop}` : '';
             }
         }
@@ -252,6 +252,27 @@ export function plain_object(...args) {
         return schema(value);
     };
 }
+// This will ignore any properties not specified. Useful to combine with and_all() etc
+export function partial_object(properties) {
+    if (!is_plain_object(properties)) {
+        throw new Error('Invalid schema');
+    }
+    return (value) => {
+        if (!is_object(value)) {
+            return DEBUG ? 'Expected object' : '';
+        }
+        let errors = {};
+        for (let prop in properties) {
+            let path = `.${prop}`;
+            if (!value.hasOwnProperty(prop) || value[prop] === undefined) {
+                errors[path] = DEBUG ? `Missing property ${prop}` : '';
+                continue;
+            }
+            validate2(properties[prop], value[prop], path, errors);
+        }
+        return errors;
+    };
+}
 export function tuple(...schemata) {
     if (schemata.length < 1) {
         throw new Error('Invalid schema: tuple needs at least one schema');
@@ -272,6 +293,9 @@ export function tuple(...schemata) {
 }
 export function map(key_schema, value_schema, min_entries = 0, max_entries = Number.MAX_SAFE_INTEGER) {
     return (value) => {
+        if (!is_object(value)) {
+            return DEBUG ? `Map is not an object` : '';
+        }
         // Validate keys first, and abort early on unexpected properties.
         for (let key in value) {
             if (validateJSON(key_schema, key) !== true)
@@ -291,6 +315,7 @@ export function map(key_schema, value_schema, min_entries = 0, max_entries = Num
         return errors;
     };
 }
+// This one short circuits
 export function and(...schemata) {
     if (schemata.length < 1) {
         throw new Error('Invalid schema: and needs at least one schema');
@@ -303,6 +328,20 @@ export function and(...schemata) {
             }
         }
         return true;
+    };
+}
+// This one executes all the schemata, collecting as many errors as it can
+export function and_all(...schemata) {
+    if (schemata.length < 1) {
+        throw new Error('Invalid schema: and needs at least one schema');
+    }
+    return (value) => {
+        let errors = {};
+        for (let schema of schemata) {
+            let res = validateJSON(schema, value);
+            merge_result(errors, '', res);
+        }
+        return errors;
     };
 }
 export function or(...schemata) {

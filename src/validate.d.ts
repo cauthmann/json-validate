@@ -23,17 +23,19 @@ Schema[] | // a tuple
  * @throws if the schema is invalid or the schema throws
  */
 export default function validateJSON(schema: Schema, value: any): true | ErrorMap;
-export declare function boolean(v: any): v is boolean;
-export declare function number(v: any): v is number;
-export declare function integer(v: any): v is number;
-export declare function string(v: any): v is string;
-export declare function array(v: any): v is Array<any>;
-export declare function plain_array(v: any): v is Array<any>;
-export declare function object(v: any): v is Record<string, any>;
+export declare function boolean(v: unknown): v is boolean;
+export declare function number(v: unknown): v is number;
+export declare function integer(v: unknown): v is number;
+export declare function string(v: unknown): v is string;
+export declare function array(v: unknown): v is Array<unknown>;
+export declare function plain_array(v: unknown): v is Array<unknown>;
+export declare function object(v: unknown): v is Record<string, unknown>;
 export declare function object(required_properties: Record<string, Schema>, optional_properties: Record<string, Schema> | null, min_optional_properties?: number, max_optional_properties?: number): Validator;
-export declare function plain_object(v: any): v is Record<string, any>;
+export declare function plain_object(v: unknown): v is Record<string, unknown>;
 export declare function plain_object(required_properties: Record<string, Schema>, optional_properties: Record<string, Schema> | null, min_optional_properties?: number, max_optional_properties?: number): Validator;
+export declare function partial_object(properties: Record<string, Schema>): Validator;
 export declare function tuple(...schemata: Schema[]): Validator;
 export declare function map(key_schema: Schema, value_schema: Schema, min_entries?: number, max_entries?: number): Validator;
 export declare function and(...schemata: Schema[]): Validator;
+export declare function and_all(...schemata: Schema[]): Validator;
 export declare function or(...schemata: Schema[]): Validator;

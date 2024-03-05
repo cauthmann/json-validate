@@ -1,5 +1,5 @@
 
-import { and, or, boolean, number, integer, string, array, object, map, tuple } from './validate.mjs';
+import { and, and_all, or, boolean, number, integer, string, array, object, map, tuple, partial_object } from './validate.mjs';
 import { match, fail, throws, finish_tests } from './testharness.mjs';
 
 // Functions as validators
@@ -228,6 +228,28 @@ match({}, {});
 		optional3: ''
 	}, ['', '.optional2']);
 }
+// Partial objects
+{
+	let schema = partial_object({
+		foo: 1
+	});
+	match(schema, {
+		foo: 1
+	});
+	match(schema, {
+		foo: 1,
+		bar: 2
+	});
+	fail(schema, {
+		foo: 2,
+		bar: 2
+	});
+	fail(schema, {
+		bar: 2
+	});
+	fail(schema, {});
+	fail(schema, 1);
+}
 
 // Objects as maps
 {
@@ -287,6 +309,11 @@ match({}, {});
 		min: 4,
 		max: 3
 	});
+}
+{
+	let schema = and_all(number, 3);
+	match(schema, 3);
+	fail(schema, 2);
 }
 
 // Enums

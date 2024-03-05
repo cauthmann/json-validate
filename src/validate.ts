@@ -37,7 +37,7 @@ export default function validateJSON(schema: Schema, value: any): true | ErrorMa
 	return true;
 }
 
-function validate2(schema: Schema, value: any, path: string, errors: ErrorMap) {
+function validate2(schema: Schema, value: unknown, path: string, errors: ErrorMap) {
 	// Schema as a function
 	if (typeof schema === 'function') {
 		let res = schema(value);
@@ -94,7 +94,7 @@ function validate2(schema: Schema, value: any, path: string, errors: ErrorMap) {
 	}
 	// Object by example
 	if (is_plain_object(schema)) {
-		value = value as Record<string, any>;
+		value = value as Record<string, unknown>;
 		if (!is_object(value)) {
 			errors[path] = DEBUG ? `Expected object` : '';
 			return;
@@ -142,24 +142,24 @@ function merge_result(errors: ErrorMap, path: string, result: ValidatorResult) {
 }
 
 // Validators for basic JSON types
-export function boolean(v: any): v is boolean {
+export function boolean(v: unknown): v is boolean {
 	return typeof v === 'boolean';
 }
-export function number(v: any): v is number {
+export function number(v: unknown): v is number {
 	return Number.isFinite(v);
 }
-export function integer(v: any): v is number {
+export function integer(v: unknown): v is number {
 	return Number.isInteger(v);
 }
-export function string(v: any): v is string {
+export function string(v: unknown): v is string {
 	return typeof v === 'string';
 }
-export function array(v: any): v is Array<any> {
+export function array(v: unknown): v is Array<unknown> {
 	if (!Array.isArray(v) || Object.getPrototypeOf(v) !== Array.prototype)
 		return false;
 	return true;
 }
-export function plain_array(v: any): v is Array<any> {
+export function plain_array(v: unknown): v is Array<unknown> {
 	if (!array(v))
 		return false;
 	if (Object.getOwnPropertySymbols(v).length > 0)
@@ -190,12 +190,12 @@ export function plain_array(v: any): v is Array<any> {
 		return false;
 	return true;
 }
-function is_object(v: any): v is Record<string, any> {
+function is_object(v: unknown): v is Record<string, unknown> {
 	if (typeof v !== 'object' || v === null || Object.getPrototypeOf(v) !== Object.prototype)
 		return false;
 	return true;
 }
-function is_plain_object(v: any): v is Record<string, any> {
+function is_plain_object(v: unknown): v is Record<string, unknown> {
 	if (!is_object(v))
 		return false;
 	if (Object.getOwnPropertySymbols(v).length > 0)
@@ -213,18 +213,18 @@ function is_plain_object(v: any): v is Record<string, any> {
 	return true;
 }
 
-export function object(v: any): v is Record<string, any>;
+export function object(v: unknown): v is Record<string, unknown>;
 export function object(required_properties: Record<string, Schema>, optional_properties: Record<string, Schema> | null, min_optional_properties?: number, max_optional_properties?: number): Validator;
-export function object(...args: any[]): any {
+export function object(...args: [unknown] | [Record<string, Schema>, Record<string, Schema>|null, number?, number?]): boolean | Validator {
 	if (args.length === 1) {
 		let value = args[0];
 		return is_object(value);
 	}
 
-	if (args.length == 0 || args.length > 5) {
+	if (args.length < 1 || args.length > 4) {
 		throw new Error(`object: wrong number of arguments`);
 	}
-	let [required_properties = null, optional_properties = null, min_optional_properties = 0, max_optional_properties = Number.MAX_SAFE_INTEGER] = args;
+	let [required_properties, optional_properties = null, min_optional_properties = 0, max_optional_properties = Number.MAX_SAFE_INTEGER] = args;
 	if (!is_plain_object(required_properties) || !is_plain_object(optional_properties)) {
 		throw new Error('Invalid schema');
 	}
@@ -235,13 +235,13 @@ export function object(...args: any[]): any {
 		}
 	}
 
-	return (value: any) => {
+	return (value: unknown) => {
 		if (!is_object(value)) {
 			return DEBUG ? 'Expected object' : '';
 		}
 
 		for (let prop in value) {
-			if (!required_properties.hasOwnProperty(prop) && !optional_properties.hasOwnProperty(prop)) {
+			if (!required_properties.hasOwnProperty(prop) && (optional_properties === null || !optional_properties.hasOwnProperty(prop))) {
 				return DEBUG ? `Unexpected property: ${prop}` : '';
 			}
 		}
@@ -271,19 +271,43 @@ export function object(...args: any[]): any {
 	}
 }
 
-export function plain_object(v: any): v is Record<string, any>;
+export function plain_object(v: unknown): v is Record<string, unknown>;
 export function plain_object(required_properties: Record<string, Schema>, optional_properties: Record<string, Schema> | null, min_optional_properties?: number, max_optional_properties?: number): Validator;
-export function plain_object(...args: any[]): any {
+export function plain_object(...args: [unknown] | [Record<string, Schema>, Record<string, Schema>|null, number?, number?]): boolean | Validator {
 	if (args.length === 1) {
 		let value = args[0];
 		return is_plain_object(value);
 	}
 
-	let schema = (object as (...args: any[]) => Validator)(...args);
-	return (value: any) => {
+	let schema = object(...args);
+	return (value: unknown) => {
 		if (!is_plain_object(value))
 			return DEBUG ? 'Expected plain object' : '';
 		return schema(value);
+	}
+}
+
+// This will ignore any properties not specified. Useful to combine with and_all() etc
+export function partial_object(properties: Record<string, Schema>): Validator {
+	if (!is_plain_object(properties)) {
+		throw new Error('Invalid schema');
+	}
+
+	return (value: unknown) => {
+		if (!is_object(value)) {
+			return DEBUG ? 'Expected object' : '';
+		}
+
+		let errors: ErrorMap = {};
+		for (let prop in properties) {
+			let path = `.${prop}`;
+			if (!value.hasOwnProperty(prop) || value[prop] === undefined) {
+				errors[path] = DEBUG ? `Missing property ${prop}` : '';
+				continue;
+			}
+			validate2(properties[prop], value[prop], path, errors);
+		}
+		return errors;
 	}
 }
 
@@ -292,7 +316,7 @@ export function tuple(...schemata: Schema[]): Validator {
 		throw new Error('Invalid schema: tuple needs at least one schema');
 	}
 
-	return (value: any) => {
+	return (value: unknown) => {
 		if (!array(value)) {
 			return DEBUG ? 'Expected array' : false;
 		}
@@ -309,7 +333,10 @@ export function tuple(...schemata: Schema[]): Validator {
 }
 
 export function map(key_schema: Schema, value_schema: Schema, min_entries: number = 0, max_entries: number = Number.MAX_SAFE_INTEGER): Validator {
-	return (value: any) => {
+	return (value: unknown) => {
+		if (!is_object(value)) {
+			return DEBUG ? `Map is not an object` : '';
+		}
 		// Validate keys first, and abort early on unexpected properties.
 		for (let key in value) {
 			if (validateJSON(key_schema, key) !== true)
@@ -330,12 +357,13 @@ export function map(key_schema: Schema, value_schema: Schema, min_entries: numbe
 	};
 }
 
+// This one short circuits
 export function and(...schemata: Schema[]): Validator {
 	if (schemata.length < 1) {
 		throw new Error('Invalid schema: and needs at least one schema');
 	}
 
-	return (value: any) => {
+	return (value: unknown) => {
 		for (let schema of schemata) {
 			let res = validateJSON(schema, value);
 			if (res !== true) {
@@ -346,12 +374,28 @@ export function and(...schemata: Schema[]): Validator {
 	}
 }
 
+// This one executes all the schemata, collecting as many errors as it can
+export function and_all(...schemata: Schema[]): Validator {
+	if (schemata.length < 1) {
+		throw new Error('Invalid schema: and needs at least one schema');
+	}
+
+	return (value: unknown) => {
+		let errors: ErrorMap = {};
+		for (let schema of schemata) {
+			let res = validateJSON(schema, value);
+			merge_result(errors, '', res);
+		}
+		return errors;
+	}
+}
+
 export function or(...schemata: Schema[]): Validator {
 	if (schemata.length < 1) {
 		throw new Error('Invalid schema: or needs at least one schema');
 	}
 
-	return (value: any) => {
+	return (value: unknown) => {
 		for (let schema of schemata) {
 			if (validateJSON(schema, value) === true)
 				return true;
@@ -376,7 +420,7 @@ function check_if_object_is_sane(o: object, is_array = false): void {
 	}
 }
 
-function check_if_array_is_sane(a: any[]): void {
+function check_if_array_is_sane(a: unknown[]): void {
 	check_if_object_is_sane(a, true);
 }
 
